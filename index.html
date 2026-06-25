@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick-Fire Math</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E14;
+    --panel:#11151F;
+    --line:#1E2430;
+    --text:#EDEFF2;
+    --muted:#8A93A6;
+    --signal:#FF5A1F;
+    --correct:#3FE0D0;
+    --wrong:#FF3B5C;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    overflow:hidden;
+    position:relative;
+  }
+  /* signature element: timer as the screen's own border, draining */
+  body::after{
+    content:"";
+    position:fixed;
+    bottom:0; left:0;
+    height:6px;
+    width:100%;
+    background:var(--signal);
+    transform-origin:left;
+    transform:scaleX(var(--time-frac, 1));
+    transition:transform 1s linear, background-color .3s ease;
+    z-index:50;
+  }
+  body.urgent::after{ background:var(--wrong); }
+
+  .stage{
+    width:100%;
+    max-width:480px;
+    padding:32px 24px 56px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:28px;
+  }
+
+  /* ---- Start screen ---- */
+  .panel{
+    width:100%;
+    text-align:center;
+  }
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-weight:600;
+    margin-bottom:10px;
+  }
+  h1{
+    font-size:38px;
+    font-weight:800;
+    letter-spacing:-0.02em;
+    margin:0 0 8px;
+    line-height:1.05;
+  }
+  .sub{
+    color:var(--muted);
+    font-size:15px;
+    margin:0 0 32px;
+    line-height:1.5;
+  }
+  .btn{
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:16px;
+    letter-spacing:.01em;
+    background:var(--signal);
+    color:#0B0E14;
+    border:none;
+    border-radius:10px;
+    padding:16px 32px;
+    cursor:pointer;
+    width:100%;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .btn:hover{ filter:brightness(1.08); }
+  .btn:active{ transform:scale(.98); }
+  .btn:focus-visible{ outline:3px solid var(--correct); outline-offset:3px; }
+  .btn-ghost{
+    background:transparent;
+    color:var(--text);
+    border:1px solid var(--line);
+  }
+
+  /* ---- HUD ---- */
+  .hud{
+    display:flex;
+    justify-content:space-between;
+    width:100%;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .hud .block{ text-align:left; }
+  .hud .block.right{ text-align:right; }
+  .hud .label{
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-weight:500;
+    margin-bottom:4px;
+  }
+  .hud .value{
+    font-size:28px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+  }
+  .hud .value.time{ color:var(--signal); }
+  .hud .value.streak{ color:var(--correct); }
+
+  /* ---- Problem ---- */
+  .problem-wrap{
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:48px 24px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:24px;
+    position:relative;
+    overflow:hidden;
+  }
+  .problem{
+    font-family:'JetBrains Mono',monospace;
+    font-size:56px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-0.01em;
+    color:var(--text);
+    user-select:none;
+  }
+  .problem.flash-correct{ animation:flashGood .26s ease; }
+  .problem.flash-wrong{ animation:flashBad .26s ease; }
+  @keyframes flashGood{ 0%{color:var(--correct);} 100%{color:var(--text);} }
+  @keyframes flashBad{ 0%{color:var(--wrong);} 100%{color:var(--text);} }
+
+  .answer-input{
+    width:100%;
+    max-width:240px;
+    background:var(--bg);
+    border:2px solid var(--line);
+    border-radius:10px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:28px;
+    font-weight:700;
+    text-align:center;
+    padding:12px;
+    font-variant-numeric:tabular-nums;
+    transition:border-color .15s ease;
+  }
+  .answer-input:focus{
+    outline:none;
+    border-color:var(--signal);
+  }
+
+  .hint{
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:.04em;
+  }
+
+  /* ---- End screen ---- */
+  .score-big{
+    font-family:'JetBrains Mono',monospace;
+    font-size:72px;
+    font-weight:800;
+    color:var(--signal);
+    line-height:1;
+    margin-bottom:4px;
+  }
+  .score-label{
+    color:var(--muted);
+    font-size:13px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    margin-bottom:32px;
+  }
+  .stat-row{
+    display:flex;
+    justify-content:space-between;
+    width:100%;
+    border-top:1px solid var(--line);
+    padding-top:20px;
+    margin-bottom:28px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .stat{ text-align:center; flex:1; }
+  .stat .n{ font-size:22px; font-weight:700; }
+  .stat .l{ font-size:11px; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; margin-top:4px;}
+  .stat .n.good{ color:var(--correct); }
+  .stat .n.bad{ color:var(--wrong); }
+
+  .hidden{ display:none !important; }
+
+  @media (prefers-reduced-motion: reduce){
+    .problem.flash-correct, .problem.flash-wrong{ animation:none; }
+    body::after{ transition:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <!-- START -->
+  <div class="panel" id="screen-start">
+    <div class="eyebrow">Quick-Fire Math</div>
+    <h1>60 seconds.<br>Hard mode.</h1>
+    <p class="sub">+ − × ÷ mixed, numbers up to 100+.<br>Answer as many as you can before time runs out.</p>
+    <button class="btn" id="btn-start">Start round</button>
+  </div>
+
+  <!-- GAME -->
+  <div class="panel hidden" id="screen-game" style="display:flex; flex-direction:column; gap:24px;">
+    <div class="hud">
+      <div class="block">
+        <div class="label">Time</div>
+        <div class="value time" id="hud-time">60</div>
+      </div>
+      <div class="block">
+        <div class="label">Score</div>
+        <div class="value" id="hud-score">0</div>
+      </div>
+      <div class="block right">
+        <div class="label">Streak</div>
+        <div class="value streak" id="hud-streak">0</div>
+      </div>
+    </div>
+
+    <div class="problem-wrap">
+      <div class="problem" id="problem-text">7 × 8</div>
+      <input class="answer-input" id="answer-input" type="text" inputmode="numeric" autocomplete="off" placeholder="?">
+      <div class="hint">Enter to submit · numbers can be negative</div>
+    </div>
+  </div>
+
+  <!-- END -->
+  <div class="panel hidden" id="screen-end">
+    <div class="eyebrow">Time's up</div>
+    <div class="score-big" id="final-score">0</div>
+    <div class="score-label">correct answers</div>
+    <div class="stat-row">
+      <div class="stat"><div class="n good" id="stat-correct">0</div><div class="l">Correct</div></div>
+      <div class="stat"><div class="n bad" id="stat-wrong">0</div><div class="l">Wrong</div></div>
+      <div class="stat"><div class="n" id="stat-best-streak">0</div><div class="l">Best streak</div></div>
+    </div>
+    <button class="btn" id="btn-again">Play again</button>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const ROUND_SECONDS = 60;
+  const body = document.body;
+
+  const screens = {
+    start: document.getElementById('screen-start'),
+    game: document.getElementById('screen-game'),
+    end: document.getElementById('screen-end'),
+  };
+  const elTime = document.getElementById('hud-time');
+  const elScore = document.getElementById('hud-score');
+  const elStreak = document.getElementById('hud-streak');
+  const elProblem = document.getElementById('problem-text');
+  const elInput = document.getElementById('answer-input');
+  const elFinalScore = document.getElementById('final-score');
+  const elStatCorrect = document.getElementById('stat-correct');
+  const elStatWrong = document.getElementById('stat-wrong');
+  const elStatBestStreak = document.getElementById('stat-best-streak');
+
+  let timeLeft, score, streak, bestStreak, wrongCount, correctCount;
+  let currentAnswer = null;
+  let timerId = null;
+
+  function show(name){
+    Object.values(screens).forEach(s => s.classList.add('hidden'));
+    screens[name].classList.remove('hidden');
+    screens[name].style.display = name === 'game' ? 'flex' : 'block';
+  }
+
+  function randInt(min, max){
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  // Hard mode: numbers up to 100+, all four ops mixed
+  function generateProblem(){
+    const ops = ['+', '-', '×', '÷'];
+    const op = ops[randInt(0, 3)];
+    let a, b, answer, text;
+
+    if (op === '+'){
+      a = randInt(10, 150);
+      b = randInt(10, 150);
+      answer = a + b;
+      text = `${a} + ${b}`;
+    } else if (op === '-'){
+      a = randInt(10, 150);
+      b = randInt(10, 150);
+      answer = a - b;
+      text = `${a} − ${b}`;
+    } else if (op === '×'){
+      a = randInt(2, 25);
+      b = randInt(2, 25);
+      answer = a * b;
+      text = `${a} × ${b}`;
+    } else { // division, guaranteed clean integer result
+      b = randInt(2, 20);
+      answer = randInt(2, 25);
+      a = b * answer;
+      text = `${a} ÷ ${b}`;
+    }
+    return { text, answer };
+  }
+
+  function nextProblem(){
+    const p = generateProblem();
+    currentAnswer = p.answer;
+    elProblem.textContent = p.text;
+    elInput.value = '';
+    elInput.focus();
+  }
+
+  function updateTimerVisual(){
+    const frac = Math.max(timeLeft, 0) / ROUND_SECONDS;
+    document.body.style.setProperty('--time-frac', frac);
+    body.classList.toggle('urgent', timeLeft <= 10);
+  }
+
+  function startRound(){
+    timeLeft = ROUND_SECONDS;
+    score = 0;
+    streak = 0;
+    bestStreak = 0;
+    wrongCount = 0;
+    correctCount = 0;
+    elScore.textContent = '0';
+    elStreak.textContent = '0';
+    elTime.textContent = String(timeLeft);
+    updateTimerVisual();
+    show('game');
+    nextProblem();
+
+    timerId = setInterval(() => {
+      timeLeft -= 1;
+      elTime.textContent = String(Math.max(timeLeft, 0));
+      updateTimerVisual();
+      if (timeLeft <= 0){
+        endRound();
+      }
+    }, 1000);
+  }
+
+  function endRound(){
+    clearInterval(timerId);
+    elFinalScore.textContent = String(correctCount);
+    elStatCorrect.textContent = String(correctCount);
+    elStatWrong.textContent = String(wrongCount);
+    elStatBestStreak.textContent = String(bestStreak);
+    show('end');
+  }
+
+  function submitAnswer(){
+    if (elInput.value.trim() === '') return;
+    const val = Number(elInput.value);
+    if (Number.isNaN(val)) return;
+
+    if (val === currentAnswer){
+      score += 10 + Math.min(streak, 10); // streak bonus, capped
+      streak += 1;
+      bestStreak = Math.max(bestStreak, streak);
+      correctCount += 1;
+      elProblem.classList.remove('flash-wrong');
+      elProblem.classList.add('flash-correct');
+    } else {
+      streak = 0;
+      wrongCount += 1;
+      elProblem.classList.remove('flash-correct');
+      elProblem.classList.add('flash-wrong');
+    }
+    elScore.textContent = String(score);
+    elStreak.textContent = String(streak);
+    setTimeout(() => {
+      elProblem.classList.remove('flash-correct', 'flash-wrong');
+    }, 260);
+    nextProblem();
+  }
+
+  elInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitAnswer();
+  });
+
+  document.getElementById('btn-start').addEventListener('click', startRound);
+  document.getElementById('btn-again').addEventListener('click', startRound);
+})();
+</script>
+
+</body>
+</html>
